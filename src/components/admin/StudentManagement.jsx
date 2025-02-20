@@ -27,7 +27,7 @@ const StudentManagement = () => {
     setError('');
     try {
       const db = getDatabase(app);
-      const studentsRef = ref(db, selectedClass);
+      const studentsRef = ref(db, `students/${selectedClass}`);
       const snapshot = await get(studentsRef);
       
       if (snapshot.exists()) {
@@ -57,7 +57,7 @@ const StudentManagement = () => {
       const db = getDatabase(app);
 
       // Check if serialNo already exists in current class
-      const existingStudentsRef = ref(db, selectedClass);
+      const existingStudentsRef = ref(db, `students/${selectedClass}`);
       const snapshot = await get(existingStudentsRef);
       const existingStudents = snapshot.val() || {};
 
@@ -81,13 +81,13 @@ const StudentManagement = () => {
 
       if (editingStudent) {
         // Update existing student
-        await set(ref(db, `${selectedClass}/${studentId}`), {
+        await set(ref(db, `students/${selectedClass}/${studentId}`), {
           ...formData,
           id: studentId
         });
       } else {
         // Add new student
-        await set(ref(db, `${selectedClass}/${studentId}`), {
+        await set(ref(db, `students/${selectedClass}/${studentId}`), {
           ...formData,
           id: studentId
         });
@@ -117,7 +117,7 @@ const StudentManagement = () => {
     
     try {
       const db = getDatabase(app);
-      await remove(ref(db, `${selectedClass}/${studentId}`));
+      await remove(ref(db, `students/${selectedClass}/${studentId}`));
       fetchStudents();
     } catch (err) {
       setError('Failed to delete student: ' + err.message);

@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import studentData from '../studentData.json';
+import { getDatabase, ref, get } from 'firebase/database';
+import { app } from '../firebase';
 
 const ClassSelection = () => {
   const navigate = useNavigate();
   const teacherData = JSON.parse(sessionStorage.getItem('teacherData') || '{}');
+  const [studentCounts, setStudentCounts] = useState({});
+  const [isLoading, setIsLoading] = useState(true);
 
   // Class mapping
   const classMapping = {
@@ -14,15 +17,41 @@ const ClassSelection = () => {
     'CSE-3': 'classC'
   };
 
-  const getStudentCount = (className) => {
-    const classKey = classMapping[className];
-    return studentData[classKey]?.length || 0;
-  };
+  useEffect(() => {
+    const fetchStudentCounts = async () => {
+      try {
+        const db = getDatabase(app);
+        const studentsRef = ref(db, 'students');
+        const snapshot = await get(studentsRef);
+
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const counts = {};
+          
+          Object.keys(classMapping).forEach(className => {
+            const dbClass = classMapping[className];
+            const classStudents = data[dbClass] || [];
+            counts[className] = Array.isArray(classStudents) 
+              ? classStudents.length 
+              : Object.keys(classStudents).length;
+          });
+          
+          setStudentCounts(counts);
+        }
+      } catch (error) {
+        console.error('Error fetching student counts:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchStudentCounts();
+  }, []);
 
   const classes = [
-    { id: '1A', name: 'CSE-1', students: getStudentCount('CSE-1') },
-    { id: '1B', name: 'CSE-2', students: getStudentCount('CSE-2') },
-    { id: '1C', name: 'CSE-3', students: getStudentCount('CSE-3') },
+    { id: '1A', name: 'CSE-1', students: studentCounts['CSE-1'] || 0 },
+    { id: '1B', name: 'CSE-2', students: studentCounts['CSE-2'] || 0 },
+    { id: '1C', name: 'CSE-3', students: studentCounts['CSE-3'] || 0 },
   ];
 
   const handleClassSelect = (classData) => {
@@ -61,9 +90,15 @@ const ClassSelection = () => {
               <h2 className="text-3xl font-bold text-gray-800 dark:text-white mb-4">
                 {classData.name}
               </h2>
-              <p className="text-gray-600 dark:text-gray-400 text-lg">
-                {classData.students} Students
-              </p>
+              {isLoading ? (
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  Loading...
+                </p>
+              ) : (
+                <p className="text-gray-600 dark:text-gray-400 text-lg">
+                  {classData.students} Students
+                </p>
+              )}
             </button>
           </motion.div>
         ))}

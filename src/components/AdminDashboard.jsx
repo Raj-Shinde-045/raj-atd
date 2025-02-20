@@ -2,20 +2,10 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import TeacherManagement from './admin/TeacherManagement';
 import StudentManagement from './admin/StudentManagement';
+import SubjectManagement from './admin/SubjectManagement';
+import AttendanceReports from './admin/AttendanceReports';
+import Settings from './admin/Settings';
 import LogoutButton from './common/LogoutButton';
-
-// Temporary placeholder components until we create them
-const SubjectManagement = () => (
-  <div className="text-2xl">Subject Management Coming Soon</div>
-);
-
-const AttendanceReports = () => (
-  <div className="text-2xl">Attendance Reports Coming Soon</div>
-);
-
-const Settings = () => (
-  <div className="text-2xl">Settings Coming Soon</div>
-);
 
 const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('students');

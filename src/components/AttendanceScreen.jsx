@@ -5,6 +5,22 @@ import Results from './Results';
 import { getDatabase, ref, get, child } from "firebase/database";
 import { app } from '../firebase';
 
+// Flash Feedback Component
+const FlashFeedback = React.memo(({ status }) => {
+  if (!status) return null;
+  
+  const color = status === 'present' ? 'bg-green-500' : 'bg-red-500';
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 0.3 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.2 }}
+      className={`fixed inset-0 ${color} pointer-events-none z-50`}
+    />
+  );
+});
+
 const StudentCard = React.memo(({ student, onSwipe, style }) => {
   const [dragDirection, setDragDirection] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -12,28 +28,18 @@ const StudentCard = React.memo(({ student, onSwipe, style }) => {
   const handleButtonClick = useCallback((status) => {
     if (isAnimating) return;
 
-    setIsAnimating(true);
     setDragDirection(status === 'present' ? 'right' : 'left');
-
-    // Use requestAnimationFrame for smoother animation
-    requestAnimationFrame(() => {
-      const animationTimeout = setTimeout(() => {
-        onSwipe(status);
-        setDragDirection(null);
-        setIsAnimating(false);
-      }, 500);
-      return () => clearTimeout(animationTimeout);
-    });
+    // Simplified animation flow - no state toggling
+    onSwipe(status);
   }, [isAnimating, onSwipe]);
 
-  // Add keyboard event listener with useCallback
   const handleKeyPress = useCallback((e) => {
     if (isAnimating) return;
 
-    if (e.key === 'ArrowRight') {
-      handleButtonClick('present');
-    } else if (e.key === 'ArrowLeft') {
-      handleButtonClick('absent');
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
+      e.preventDefault(); // Prevent any default scrolling
+      const status = e.key === 'ArrowRight' ? 'present' : 'absent';
+      handleButtonClick(status);
     }
   }, [isAnimating, handleButtonClick]);
 
@@ -47,7 +53,7 @@ const StudentCard = React.memo(({ student, onSwipe, style }) => {
       drag={!isAnimating ? "x" : false}
       dragConstraints={{ left: 0, right: 0 }}
       dragElastic={0.7}
-      dragTransition={{ bounceStiffness: 400, bounceDamping: 25 }}
+      dragTransition={{ bounceStiffness: 600, bounceDamping: 30 }}
       onDragEnd={(e, { offset }) => {
         const swipe = offset.x;
         if (Math.abs(swipe) > 100 && !isAnimating) {
@@ -59,22 +65,15 @@ const StudentCard = React.memo(({ student, onSwipe, style }) => {
       }}
       style={{
         ...style,
-        willChange: 'transform',
-        transform: `
-          ${isAnimating && dragDirection === 'right' ? 'translateX(120%)' :
-          isAnimating && dragDirection === 'left' ? 'translateX(-120%)' : 'none'}
-          scale(${isAnimating ? 0.98 : 1})
-        `,
-        transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)'
+        transform: dragDirection === 'right' ? 'translateX(120%)' :
+                  dragDirection === 'left' ? 'translateX(-120%)' : 'none'
       }}
       onDrag={(e, { offset }) => {
         if (!isAnimating) {
-          requestAnimationFrame(() => {
-            const direction = offset.x > 0 ? 'right' : offset.x < 0 ? 'left' : null;
-            if (direction !== dragDirection) {
-              setDragDirection(direction);
-            }
-          });
+          const direction = offset.x > 0 ? 'right' : offset.x < 0 ? 'left' : null;
+          if (direction !== dragDirection) {
+            setDragDirection(direction);
+          }
         }
       }}
       className="absolute w-full h-[90vh]"
@@ -84,13 +83,11 @@ const StudentCard = React.memo(({ student, onSwipe, style }) => {
           ${dragDirection === 'right' ? 'bg-green-50 border-l-8 border-green-500' :
           dragDirection === 'left' ? 'bg-red-50 border-r-8 border-red-500' : ''}`}
         style={{
-          transition: 'all 0.3s ease',
-          willChange: 'background-color, border, box-shadow',
           backgroundColor: 'white',
           boxShadow: dragDirection === 'right'
-            ? '0 0 30px 5px rgba(34, 197, 94, 0.4), inset 0 0 20px rgba(34, 197, 94, 0.2)'
+            ? '0 0 30px 5px rgba(34, 197, 94, 0.4)'
             : dragDirection === 'left'
-            ? '0 0 30px 5px rgba(239, 68, 68, 0.4), inset 0 0 20px rgba(239, 68, 68, 0.2)'
+            ? '0 0 30px 5px rgba(239, 68, 68, 0.4)'
             : '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
         }}
       >
@@ -145,6 +142,10 @@ const StudentCard = React.memo(({ student, onSwipe, style }) => {
 const AttendanceScreen = () => {
   const location = useLocation();
   const [students, setStudents] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isCompleted, setIsCompleted] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [flashStatus, setFlashStatus] = useState(null);
 
   useEffect(() => {
     const fetchStudents = async () => {
@@ -161,7 +162,7 @@ const AttendanceScreen = () => {
         const dbRef = ref(database);
 
         // Fetch students data from Firebase
-        const snapshot = await get(child(dbRef, selectedClass));
+        const snapshot = await get(child(dbRef, `students/${selectedClass}`));
 
         console.log('Raw data from Firebase:', snapshot.val());
 
@@ -208,11 +209,12 @@ const AttendanceScreen = () => {
 
     fetchStudents();
   }, [location.state?.selectedClass, location.state?.rollRange]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isCompleted, setIsCompleted] = useState(false);
-  const [history, setHistory] = useState([]);
 
   const handleSwipe = (status) => {
+    // Show flash feedback
+    setFlashStatus(status);
+    setTimeout(() => setFlashStatus(null), 200);
+
     setStudents((prevStudents) => {
       const newStudents = [...prevStudents];
       newStudents[currentIndex] = { ...newStudents[currentIndex], status };
@@ -257,6 +259,7 @@ const AttendanceScreen = () => {
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-gray-50 to-gray-100 overflow-hidden">
+      <FlashFeedback status={flashStatus} />
       {/* Progress Bar */}
       <div className="w-full h-10 bg-gray-200 relative">
         <motion.div
@@ -298,7 +301,7 @@ const AttendanceScreen = () => {
         <AnimatePresence>
           {students.slice(currentIndex, currentIndex + 3).map((student, index) => (
             <StudentCard
-              key={student.id}
+              key={student.id || student.rollNo}
               student={student}
               onSwipe={handleSwipe}
               style={{
@@ -310,7 +313,6 @@ const AttendanceScreen = () => {
           ))}
         </AnimatePresence>
       </div>
-
     </div>
   );
 };
